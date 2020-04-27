@@ -1,0 +1,10 @@
+# Test binary, build with `go test -c`
+*.test
+
+.idea/
+temp/
+*.iml
+*.retry
+
+logs/*.log
+*.swp

@@ -1,15 +1,20 @@
-package main
+package stats
 
 import (
+	"encoding/json"
 	"errors"
+	"io/ioutil"
 	"math/rand"
 	"strings"
-	"time"
 )
 
 type SPair struct {
 	first  string
 	second string
+}
+
+func NewSPair(first, second string) SPair {
+	return SPair{first: first, second: second}
 }
 
 func (sp SPair) MarshalText() (text []byte, err error) {
@@ -26,10 +31,6 @@ func (sp SPair) UnmarshalText(text []byte) error {
 	return nil
 }
 
-type Updatable interface {
-	update(other *Updatable)
-}
-
 type Unigrams map[string]int
 
 func (h Unigrams) setDefault(k string, v int) (set bool, r int) {
@@ -41,18 +42,13 @@ func (h Unigrams) setDefault(k string, v int) (set bool, r int) {
 	return
 }
 
-//type Unigrams2 struct {
-//	stat Counter
-//}
-
 func (u Unigrams) update(other Unigrams) {
 	for k, v := range other {
 		u.setDefault(k, v)
-		//u.stat[k] += v
 	}
 }
 
-func (u Unigrams) addOne(k string) {
+func (u Unigrams) AddOne(k string) {
 	v, ok := u[k]
 	if !ok {
 		v = 0
@@ -60,13 +56,12 @@ func (u Unigrams) addOne(k string) {
 	u.setDefault(k, v+1)
 }
 
-func (u Unigrams) choice() (string, error) {
+func (u Unigrams) Choice() (string, error) {
 	var totalWeight int
 	for _, v := range u {
 		totalWeight += v
 	}
 
-	rand.Seed(time.Now().UnixNano())
 	r := rand.Intn(totalWeight)
 	for word, weight := range u {
 		r -= weight
@@ -81,13 +76,11 @@ type Bigrams map[string]Unigrams
 
 func (u Bigrams) update(other Bigrams) {
 	for b, s := range other {
-		u.get(b).update(s)
-
+		u.Get(b).update(s)
 	}
 }
 
-func (u Bigrams) get(k string) *Unigrams {
-
+func (u Bigrams) Get(k string) *Unigrams {
 	r, ok := u[k]
 	if ok {
 		return &r
@@ -102,11 +95,11 @@ type Trigrams map[SPair]Unigrams
 
 func (u Trigrams) update(other Trigrams) {
 	for b, s := range other {
-		u.get(b).update(s)
+		u.Get(b).update(s)
 	}
 }
 
-func (u Trigrams) get(k SPair) *Unigrams {
+func (u Trigrams) Get(k SPair) *Unigrams {
 	r, ok := u[k]
 	if ok {
 		return &r
@@ -123,12 +116,30 @@ type Stats struct {
 	Tri   Trigrams
 }
 
-func (s Stats) update(other Stats) {
+func NewStats() Stats {
+	return Stats{Unigrams{}, Bigrams{}, Trigrams{}}
+}
+
+func (s *Stats) UpdateAll(other Stats) {
 	s.Start.update(other.Start)
 	s.Bi.update(other.Bi)
 	s.Tri.update(other.Tri)
 }
 
-func NewStats() Stats {
-	return Stats{Unigrams{}, Bigrams{}, Trigrams{}}
+func (s *Stats) UpdateStart(word string) {
+	s.Start.AddOne(word)
+}
+
+func (s *Stats) UpdateFollowing(word, prev, prevprev string) {
+	if prev != "" {
+		s.Bi.Get(prev).AddOne(word)
+		if prevprev != "" {
+			s.Tri.Get(NewSPair(prevprev, prev)).AddOne(word)
+		}
+	}
+}
+
+func (s Stats) DumpToFile(path string) error {
+	statsJson, _ := json.Marshal(s)
+	return ioutil.WriteFile(path, statsJson, 0644)
 }

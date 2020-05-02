@@ -1,9 +1,8 @@
-package stats
+package markov
 
 import (
 	"bufio"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -16,7 +15,8 @@ var (
 	tokenRegex, _ = regexp.Compile("([0-9a-zA-Zа-яА-Яё@.,!?:_/\\-']+)")
 )
 
-func CreateFromFiles(paths ...string) (stats Stats) {
+func CreateStatsFromFiles(paths ...string) WordStats {
+	stats := NewStats()
 	for _, path := range paths {
 		file, err := os.Open(path)
 		if err != nil {
@@ -26,7 +26,7 @@ func CreateFromFiles(paths ...string) (stats Stats) {
 
 		sc := bufio.NewScanner(file)
 		for sc.Scan() {
-			stats.UpdateAll(parseLine(sc.Text()))
+			stats.Merge(createStatsFromLine(sc.Text()))
 		}
 
 		if err := sc.Err(); err != nil {
@@ -34,10 +34,10 @@ func CreateFromFiles(paths ...string) (stats Stats) {
 		}
 		file.Close()
 	}
-	return
+	return stats
 }
 
-func LoadFromFile(filename string) (stats Stats, err error) {
+func LoadStatsFromFile(filename string) (stats WordStats, err error) {
 	payload, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return
@@ -46,34 +46,18 @@ func LoadFromFile(filename string) (stats Stats, err error) {
 	return
 }
 
-func parseLine(line string) Stats {
-	var stats = NewStats()
+func createStatsFromLine(line string) WordStats {
+	stats := NewStats()
 	var prev, prevprev string
-	var sos = true
-	for _, token := range tokenize(line, false) {
+	sos := true
+	for _, token := range tokenRegex.FindAllString(strings.ToLower(line), -1) {
 		if sos {
-			stats.UpdateStart(token)
+			stats.Add(token)
 		} else {
-			stats.UpdateFollowing(token, prev, prevprev)
+			stats.Update(token, prev, prevprev)
 		}
 		sos = strings.ContainsAny(token[len(token)-1:], endOfSen)
 		prev, prevprev = token, prev
 	}
-	s, e := json.Marshal(stats)
-	fmt.Println(e)
-	if e != nil {
-		log.Panic(e)
-	}
-	fmt.Println(string(s))
 	return stats
-}
-
-func tokenize(line string, strip bool) []string {
-	words := tokenRegex.FindAllString(strings.ToLower(line), -1)
-	if strip {
-		for i, word := range words {
-			words[i] = strings.TrimSuffix(word, endOfSen)
-		}
-	}
-	return words
 }

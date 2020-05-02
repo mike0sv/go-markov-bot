@@ -3,8 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/mike0sv/go-markov-bot/handlers"
-	"github.com/mike0sv/go-markov-bot/stats"
-	"github.com/mike0sv/go-markov-bot/word"
+	"github.com/mike0sv/go-markov-bot/markov"
 	"github.com/urfave/cli"
 	"log"
 	"math/rand"
@@ -14,7 +13,7 @@ import (
 	"time"
 )
 
-const defaultWordToGenerateCount = 10
+const defaultSentencesToGenerateCount = 10
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
@@ -48,8 +47,8 @@ func Parse(ctx *cli.Context) error {
 	args := ctx.Args()
 	output := args[len(args)-1]
 	files := args[:len(args)-1]
-	statsInstance := stats.CreateFromFiles(files...)
-	return statsInstance.DumpToFile(output)
+	stats := markov.CreateStatsFromFiles(files...)
+	return stats.DumpToFile(output)
 }
 
 func Generate(ctx *cli.Context) error {
@@ -59,13 +58,13 @@ func Generate(ctx *cli.Context) error {
 		log.Panic(err)
 		return err
 	}
-	wordGenerator := word.NewGenerator(defaultWordToGenerateCount)
-	statsInstance, err := stats.LoadFromFile(filename)
+	wordGenerator := markov.NewTextGenerator(defaultSentencesToGenerateCount)
+	wordStats, err := markov.LoadStatsFromFile(filename)
 	if err != nil {
 		log.Panic(err)
 	}
 
-	words, err := wordGenerator.GenerateN(&statsInstance, ctx.Args()[2:], count)
+	words, err := wordGenerator.GenerateN(&wordStats, ctx.Args()[2:], count)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -78,14 +77,14 @@ func Generate(ctx *cli.Context) error {
 
 func Run(ctx *cli.Context) error {
 	filename := ctx.Args()[0]
-	statsInstance, err := stats.LoadFromFile(filename)
+	stats, err := markov.LoadStatsFromFile(filename)
 	if err != nil {
 		log.Panic(err)
 		return err
 	}
-	wordGenerator := word.NewGenerator(defaultWordToGenerateCount)
-	http.HandleFunc("/", handlers.CreateStats(&statsInstance, wordGenerator)) // установим роутер
-	err = http.ListenAndServe("0.0.0.0:9000", nil)                            // задаем слушать порт
+	wordGenerator := markov.NewTextGenerator(defaultSentencesToGenerateCount)
+	http.HandleFunc("/", handlers.CreateText(&stats, wordGenerator))
+	err = http.ListenAndServe("0.0.0.0:9000", nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 		return err

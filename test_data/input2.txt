@@ -1,0 +1,2 @@
+Note you always import with the full github.com/... path: relative imports aren't allowed in a workspace.
+If you get tired of typing paths, use goimports. If you were getting by with go run, it's time to switch to go build: run deals poorly with multiple-file mains and I didn't bother to test but heard (from Dave Cheney here) go run doesn't rebuild dirty dependencies.

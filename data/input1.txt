@@ -1,3 +1,0 @@
-Any number of files in a directory are a single package; symbols declared in one file are available to the others without any imports or qualifiers. All of the files do need the same package foo declaration at the top (or you'll get an error from go build).
-
-You do need GOPATH set to the directory where your pkg, src, and bin directories reside. This is just a matter of preference, but it's common to have a single workspace for all your apps (sometimes $HOME), not one per app.
